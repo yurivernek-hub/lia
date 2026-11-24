@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+fundo/build/
+memoria_jarvisb.json
+perfil_jarvisb.json
+.env
+*.log
+.venv/
+memoria_jarvis.json
+perfil_jarvis.json
+*.bak*
+
+# Private data and generated files that may contain local paths
+/settings.json
+/profile.json
+/memories.json
+/opencode_events.jsonl
+/background/build/
