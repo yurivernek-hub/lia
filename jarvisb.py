@@ -12,6 +12,7 @@ import re
 import random
 import subprocess
 import importlib.util
+import threading
 
 import numpy as np
 import pyaudio
@@ -49,7 +50,6 @@ from tools import looks_like_system_request
 from tool_flow import process_with_tools
 from voice_control import VoiceController
 import background_tasks
-import collaboration_voice
 import reminders
 from morning_routine import execute_routine_morning
 from events import bus,emit
@@ -72,6 +72,21 @@ print("✓ Groq configurado")
 personal_memory = MemoryConversation(
     llm.evaluate_memory, config.USER_SETTINGS["memory_mode"], config.MAX_MEMORIES
 )
+pending_memory_analysis = None
+memory_analysis_lock = threading.Lock()
+
+
+def _analyze_memory_in_background(text, context):
+    try:
+        notice = personal_memory.observe(text, context)
+        if notice:
+            voice.announce(
+                notice,
+                origin="personal memory",
+                valid=lambda: personal_memory.pending is not None,
+            )
+    except Exception as error:
+        print(f"[memory] Background analysis failed: {error}")
 
 _forms = preferred_addresses()
 if _forms:
@@ -122,9 +137,6 @@ if microphone.LEVEL_NOISE_ENVIRONMENT > 3000:
 voice = VoiceController(PersistentPiper())
 
 manager = background_tasks.start_manager(voice)
-
-# Co-work mode: Lia coordinates while OpenCode writes code (collaboration.py).
-colab = collaboration_voice.CollaborationBridge(voice)
 
 # Reminders, alarms, and meeting alerts use the same speech queue.
 reminders.start(voice.announce,search_schedule=reminders.search_schedule_today)
@@ -380,19 +392,6 @@ try:
         if command_text is None:
             personal_memory.pending = None
 
-            # Co-work is open (or opening): Lia does NOT go back to sleep after
-            # silence. Deliver queued narration or results
-            # and keep listening. Only "that's all"/end closes the session.
-            if colab.active or colab.opening:
-
-                voice.state = "conversa"
-
-                voice.deliver(mic_stream,oww_model,context="fim_de_turno")
-
-                modo_conversacao = True
-
-                continue
-
             modo_conversacao = False
             continue
 
@@ -422,6 +421,9 @@ try:
 
             continue
 
+        if pending_memory_analysis is not None:
+            pending_memory_analysis.join()
+
         prior_turns = list(llm.history)
         response = personal_memory.command(command_text, prior_turns)
         if personal_memory.changed_existing:
@@ -433,8 +435,6 @@ try:
             response = personal_memory.explicit_address(command_text, prior_turns)
 
         analyze_turn = response is None
-        if response is None:
-            response = colab.handle(command_text)
         if response is None:
             response = manager.respond_about_tasks(command_text)
 
@@ -486,12 +486,13 @@ try:
         voice.deliver(mic_stream,oww_model,context="fim_de_turno")
 
         if analyze_turn:
-            notice = personal_memory.observe(command_text, prior_turns)
-            if notice:
-                emit("state", state="speaking")
-                emit("response_end", text=notice)
-                voice.speak(notice)
-                voice.wait_end()
+            pending_memory_analysis = threading.Thread(
+                target=_analyze_memory_in_background,
+                args=(command_text, prior_turns),
+                name="lia-memory-analysis",
+                daemon=True,
+            )
+            pending_memory_analysis.start()
 
         print("\n🎙 Pode continuar falando...")
 
@@ -506,11 +507,6 @@ except Exception as e:
     print(f"\n[!] Erro capturado: {e}")
 
 finally:
-
-    try:
-        colab.close_silent()
-    except Exception:
-        pass
 
     try:
         manager.finish()

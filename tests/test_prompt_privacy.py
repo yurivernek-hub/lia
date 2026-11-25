@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PROMPT_FILES = (
     "llm.py", "task.py", "personality.py", "morning_routine.py",
-    "web_search.py", "collaboration.py", "stt.py", "reminders.py",
+    "web_search.py", "stt.py", "reminders.py",
 )
 
 
@@ -26,7 +26,7 @@ class PromptPrivacyTests(unittest.TestCase):
 
     def test_private_data_files_are_ignored(self):
         ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
-        for path in ("/settings.json", "/profile.json", "/memories.json", "/opencode_events.jsonl"):
+        for path in ("/settings.json", "/profile.json", "/memories.json"):
             self.assertIn(path, ignored)
 
 

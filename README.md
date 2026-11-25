@@ -127,8 +127,6 @@ The local regression suite runs with `python -m unittest discover -s tests`. To 
 ├── calendar_tools.py      # Calendar integration
 ├── web_search.py          # Web search integration
 ├── reminders.py           # Reminder scheduling
-├── collaboration.py       # Coding collaboration coordinator
-├── collaboration_voice.py # Voice bridge for collaboration
 ├── interface/             # Floating panel and KWin integration
 ├── background/            # C++ desktop background
 └── wakeword/              # Wake word model
