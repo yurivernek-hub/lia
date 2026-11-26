@@ -1,0 +1,8 @@
+# Install the PortAudio development headers before building PyAudio.
+groq
+httpx
+numpy
+openwakeword
+piper-tts
+PyAudio
+PySide6
